@@ -20,6 +20,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static final RegExp _emailRegex = RegExp(
     r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
   );
+
+  String _initials(String name, String email) {
+    final cleanedName = name.trim();
+    final cleanedEmail = email.trim();
+    final source = cleanedName.isNotEmpty && cleanedName != 'Username'
+        ? cleanedName
+        : cleanedEmail.isNotEmpty
+            ? cleanedEmail.split('@').first
+            : 'User';
+
+    final parts = source.split(RegExp(r'[\s_\-\.]'));
+    final letters =
+        parts.where((part) => part.isNotEmpty).map((part) => part[0]).toList();
+
+    if (letters.isEmpty) return 'U';
+    if (letters.length == 1) {
+      final word = parts.firstWhere((part) => part.isNotEmpty);
+      return word.length >= 2
+          ? '${word[0]}${word[1]}'.toUpperCase()
+          : letters.first.toUpperCase();
+    }
+
+    return '${letters[0]}${letters[1]}'.toUpperCase();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -108,55 +133,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Center(
                   child: Column(
                     children: [
-                      // Profile Picture
-                      Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: [
-                                  theme.colorScheme.primary,
-                                  theme.colorScheme.secondary,
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                            ),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: theme.scaffoldBackgroundColor,
-                              ),
-                              child: const CircleAvatar(
-                                radius: 50,
-                                backgroundColor: Colors.grey,
-                                backgroundImage: AssetImage(
-                                  'lib/images/lumi-asking-step-3.png',
-                                ),
-                              ),
-                            ),
+                      Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              theme.colorScheme.primary,
+                              theme.colorScheme.secondary,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: theme.scaffoldBackgroundColor,
-                                width: 2,
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.edit_rounded,
-                              size: 14,
+                        ),
+                        child: Center(
+                          child: Text(
+                            _initials(displayName, displayEmail),
+                            style: theme.textTheme.headlineSmall?.copyWith(
                               color: theme.colorScheme.onPrimary,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
                             ),
                           ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                       _isLoadingProfile
@@ -209,33 +209,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildProfileStat(
-                        context,
-                        '12',
-                        'Goals',
-                        Icons.flag_rounded,
-                        const Color(0xFF6366f1),
-                      ),
-                      _buildDivider(context),
-                      _buildProfileStat(
-                        context,
-                        '48h',
-                        'Focus',
-                        Icons.timer_rounded,
-                        const Color(0xFFf59e0b),
-                      ),
-                      _buildDivider(context),
-                      _buildProfileStat(
-                        context,
-                        '5',
-                        'Streak',
-                        Icons.local_fire_department_rounded,
-                        const Color(0xFFef4444),
-                      ),
-                    ],
+                  child: FutureBuilder<Map<String, int>>(
+                    future: _calculateCompletionStats(),
+                    builder: (context, snapshot) {
+                      final completedGoals =
+                          snapshot.data?['completedGoals'] ?? 0;
+                      final completedTasks =
+                          snapshot.data?['completedTasks'] ?? 0;
+
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const SizedBox(
+                          height: 72,
+                          child: Center(
+                            child: SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        );
+                      }
+
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildProfileStat(
+                            context,
+                            completedGoals.toString(),
+                            'Completed Goals',
+                            Icons.flag_rounded,
+                            const Color(0xFF6366f1),
+                          ),
+                          _buildDivider(context),
+                          _buildProfileStat(
+                            context,
+                            completedTasks.toString(),
+                            'Completed Tasks',
+                            Icons.check_circle_rounded,
+                            const Color(0xFF10b981),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -360,6 +375,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildDivider(BuildContext context) {
     return Container(height: 40, width: 1, color: Colors.grey.withAlpha(50));
+  }
+
+  Future<Map<String, int>> _calculateCompletionStats() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return {'completedGoals': 0, 'completedTasks': 0};
+    }
+
+    final goalsSnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('goals')
+        .get();
+
+    int completedGoals = 0;
+    int completedTasks = 0;
+
+    for (final goal in goalsSnapshot.docs) {
+      final tasksSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('goals')
+          .doc(goal.id)
+          .collection('tasks')
+          .get();
+
+      final tasks = tasksSnapshot.docs;
+      if (tasks.isEmpty) {
+        continue;
+      }
+
+      final completed = tasks
+          .where((doc) => (doc.data()['isCompleted'] ?? false) == true)
+          .length;
+
+      completedTasks += completed;
+
+      if (completed == tasks.length) {
+        completedGoals += 1;
+      }
+    }
+
+    return {
+      'completedGoals': completedGoals,
+      'completedTasks': completedTasks,
+    };
   }
 
   Widget _buildProfileStat(

@@ -53,6 +53,20 @@ class _HomeScreenState extends State<HomeScreen> {
     return date.difference(start).inDays + 1;
   }
 
+  String _greetingName(User user) {
+    final displayName = user.displayName?.trim();
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+
+    final email = user.email?.trim();
+    if (email != null && email.isNotEmpty && email.contains('@')) {
+      return email.split('@').first;
+    }
+
+    return 'there';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -95,6 +109,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   return CustomScrollView(
                     slivers: [
                       SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
+                        sliver: SliverToBoxAdapter(
+                          child: Text(
+                            'Hello, ${_greetingName(user)}',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SliverPadding(
                         padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
                         sliver: SliverToBoxAdapter(
                           child: _buildHeroHeader(
@@ -118,46 +143,50 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                        sliver: SliverGrid.count(
-                          crossAxisCount:
-                              MediaQuery.of(context).size.width < 420 ? 2 : 4,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 1.05,
-                          children: [
-                            _buildStatTile(
-                              theme,
-                              title: 'Total tasks',
-                              value: totalTasks.toString(),
-                              subtitle: 'Across all goals',
-                              icon: Icons.layers_rounded,
-                              accent: theme.colorScheme.primary,
-                            ),
-                            _buildStatTile(
-                              theme,
-                              title: 'Completed tasks',
-                              value: completedTasks.toString(),
-                              subtitle: 'Well done',
-                              icon: Icons.check_circle_rounded,
-                              accent: theme.colorScheme.secondary,
-                            ),
-                            _buildStatTile(
-                              theme,
-                              title: 'Remaining',
-                              value: remainingTasks.toString(),
-                              subtitle: 'Keep going',
-                              icon: Icons.flag_rounded,
-                              accent: Colors.orange,
-                            ),
-                            _buildStatTile(
-                              theme,
-                              title: 'Goals completed',
-                              value: '$completedGoals / $totalGoals',
-                              subtitle: 'Fully finished',
-                              icon: Icons.emoji_events_rounded,
-                              accent: AppTheme.auroraPurple,
-                            ),
-                          ],
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 200,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 1.1,
+                          ),
+                          delegate: SliverChildListDelegate(
+                            [
+                              _buildStatTile(
+                                theme,
+                                title: 'Total tasks',
+                                value: totalTasks.toString(),
+                                subtitle: 'Across all goals',
+                                icon: Icons.layers_rounded,
+                                accent: theme.colorScheme.primary,
+                              ),
+                              _buildStatTile(
+                                theme,
+                                title: 'Completed tasks',
+                                value: completedTasks.toString(),
+                                subtitle: 'Well done',
+                                icon: Icons.check_circle_rounded,
+                                accent: theme.colorScheme.secondary,
+                              ),
+                              _buildStatTile(
+                                theme,
+                                title: 'Remaining',
+                                value: remainingTasks.toString(),
+                                subtitle: 'Keep going',
+                                icon: Icons.flag_rounded,
+                                accent: Colors.orange,
+                              ),
+                              _buildStatTile(
+                                theme,
+                                title: 'Goals completed',
+                                value: '$completedGoals / $totalGoals',
+                                subtitle: 'Fully finished',
+                                icon: Icons.emoji_events_rounded,
+                                accent: AppTheme.auroraPurple,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       SliverPadding(
@@ -245,15 +274,26 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Icon(icon, color: accent),
           const Spacer(),
-          Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-          Text(title, style: theme.textTheme.bodyMedium),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium,
+          ),
           Text(
             subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.textTheme.bodySmall?.color?.withOpacity(0.6),
             ),

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../utils/app_theme.dart';
 
 class GoalTaskScreen extends StatefulWidget {
   final String goalId;
@@ -23,6 +24,7 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final theme = Theme.of(context);
 
     if (user == null) {
       return const Scaffold(
@@ -39,14 +41,20 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
     final tasksRef = goalRef.collection('tasks');
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(widget.title),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: AppTheme.auroraBackgroundGradient(theme.brightness),
+          ),
+        ),
         actions: [
           PopupMenuButton<String>(
+            color: theme.colorScheme.surface,
             onSelected: (value) {
               if (value == 'delete') {
                 _confirmDeleteGoal();
@@ -69,120 +77,148 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
         icon: const Icon(Icons.add),
         label: const Text("Add Task"),
       ),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: goalRef.snapshots(),
-        builder: (context, goalSnapshot) {
-          if (!goalSnapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: AppTheme.auroraBackgroundGradient(theme.brightness),
+        ),
+        child: StreamBuilder<DocumentSnapshot>(
+          stream: goalRef.snapshots(),
+          builder: (context, goalSnapshot) {
+            if (!goalSnapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          final goalData = goalSnapshot.data!.data() as Map<String, dynamic>?;
-          final description = goalData?['description'] ?? '';
+            final goalData = goalSnapshot.data!.data() as Map<String, dynamic>?;
+            final description = goalData?['description'] ?? '';
 
-          return StreamBuilder<QuerySnapshot>(
-            stream: tasksRef.snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Center(
-                  child: Text("Error:\n${snapshot.error}"),
-                );
-              }
-
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final docs = snapshot.data!.docs;
-
-              docs.sort((a, b) {
-                final aData = a.data() as Map<String, dynamic>;
-                final bData = b.data() as Map<String, dynamic>;
-                final aOrder = aData['order'] ?? 0;
-                final bOrder = bData['order'] ?? 0;
-                return aOrder.compareTo(bOrder);
-              });
-
-              final pending = docs.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                return !(data['isCompleted'] ?? false);
-              }).toList();
-
-              final completed = docs.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                return data['isCompleted'] ?? false;
-              }).toList();
-
-              final total = docs.length;
-              final done = completed.length;
-              final progress = total == 0 ? 0.0 : done / total;
-
-              return ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  _buildGoalCard(description, progress, done, total),
-                  const SizedBox(height: 30),
-                  if (pending.isNotEmpty) ...[
-                    const Text(
-                      "Pending Tasks",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 10),
-                    ReorderableListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      buildDefaultDragHandles: false,
-                      itemCount: pending.length,
-                      onReorder: (oldIndex, newIndex) =>
-                          _onReorder(pending, oldIndex, newIndex),
-                      itemBuilder: (context, index) {
-                        final task = pending[index];
-                        return _taskTile(
-                          task,
-                          ValueKey(task.id),
-                          index,
-                          reorderable: true,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 30),
-                  ],
-                  if (completed.isNotEmpty) ...[
-                    const Text(
-                      "Completed Tasks",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 10),
-                    ...completed.map(
-                      (task) => _taskTile(
-                        task,
-                        ValueKey(task.id),
-                        0,
-                        reorderable: false,
+            return StreamBuilder<QuerySnapshot>(
+              stream: tasksRef.snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      "Error:\n${snapshot.error}",
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
+                  );
+                }
+
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final docs = snapshot.data!.docs;
+
+                docs.sort((a, b) {
+                  final aData = a.data() as Map<String, dynamic>;
+                  final bData = b.data() as Map<String, dynamic>;
+                  final aOrder = aData['order'] ?? 0;
+                  final bOrder = bData['order'] ?? 0;
+                  return aOrder.compareTo(bOrder);
+                });
+
+                final pending = docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return !(data['isCompleted'] ?? false);
+                }).toList();
+
+                final completed = docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return data['isCompleted'] ?? false;
+                }).toList();
+
+                final total = docs.length;
+                final done = completed.length;
+                final progress = total == 0 ? 0.0 : done / total;
+
+                return ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    _buildGoalCard(
+                      description,
+                      progress,
+                      done,
+                      total,
+                      theme,
+                    ),
+                    const SizedBox(height: 30),
+                    if (pending.isNotEmpty) ...[
+                      Text(
+                        "Pending Tasks",
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ReorderableListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        buildDefaultDragHandles: false,
+                        itemCount: pending.length,
+                        onReorder: (oldIndex, newIndex) =>
+                            _onReorder(pending, oldIndex, newIndex),
+                        itemBuilder: (context, index) {
+                          final task = pending[index];
+                          return _taskTile(
+                            task,
+                            ValueKey(task.id),
+                            index,
+                            reorderable: true,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 30),
+                    ],
+                    if (completed.isNotEmpty) ...[
+                      Text(
+                        "Completed Tasks",
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...completed.map(
+                        (task) => _taskTile(
+                          task,
+                          ValueKey(task.id),
+                          0,
+                          reorderable: false,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              );
-            },
-          );
-        },
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildGoalCard(
-      String description, double progress, int done, int total) {
+    String description,
+    double progress,
+    int done,
+    int total,
+    ThemeData theme,
+  ) {
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             blurRadius: 12,
-            color: Colors.black.withOpacity(0.05),
+            color: isDark
+                ? Colors.black.withOpacity(0.35)
+                : Colors.black.withOpacity(0.05),
           )
         ],
       ),
@@ -191,16 +227,18 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
         children: [
           Text(
             widget.title,
-            style: const TextStyle(
-              fontSize: 22,
+            style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           if (description.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
               description,
-              style: TextStyle(color: Colors.grey[700]),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.textTheme.bodySmall?.color?.withOpacity(0.75),
+              ),
             ),
           ],
           const SizedBox(height: 20),
@@ -208,7 +246,7 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
             borderRadius: BorderRadius.circular(12),
             child: Container(
               height: 12,
-              color: Colors.grey[300],
+              color: theme.colorScheme.surfaceVariant,
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   return Align(
@@ -216,11 +254,11 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 400),
                       width: constraints.maxWidth * progress,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            Color(0xFF4A90E2),
-                            Color(0xFF8E44AD),
+                            theme.colorScheme.primary,
+                            theme.colorScheme.secondary,
                           ],
                         ),
                       ),
@@ -231,7 +269,10 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text("$done of $total tasks completed"),
+          Text(
+            "$done of $total tasks completed",
+            style: theme.textTheme.bodySmall,
+          ),
         ],
       ),
     );
@@ -300,6 +341,7 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
     int index, {
     required bool reorderable,
   }) {
+    final theme = Theme.of(context);
     final data = task.data() as Map<String, dynamic>;
     final isCompleted = data['isCompleted'] ?? false;
     final title = data['title'] ?? 'Task';
@@ -310,6 +352,7 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
+      color: theme.colorScheme.surface,
       child: ListTile(
         leading: reorderable
             ? ReorderableDragStartListener(
@@ -317,6 +360,7 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
                 child: const Icon(Icons.drag_handle),
               )
             : const SizedBox(width: 24),
+        iconColor: theme.colorScheme.onSurface,
         title: Row(
           children: [
             Checkbox(
@@ -329,6 +373,7 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
               child: Text(
                 title,
                 style: TextStyle(
+                  color: theme.colorScheme.onSurface,
                   decoration: isCompleted ? TextDecoration.lineThrough : null,
                 ),
               ),
@@ -376,13 +421,24 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
   }
 
   void _showAddTaskDialog() {
+    final theme = Theme.of(context);
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
         title: const Text("Add New Task"),
         content: TextField(
           controller: _taskController,
           autofocus: true,
+          style: TextStyle(color: theme.colorScheme.onSurface),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.colorScheme.surfaceVariant,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
         ),
         actions: [
           TextButton(
@@ -401,14 +457,25 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
   void _showEditDialog(QueryDocumentSnapshot task) {
     final data = task.data() as Map<String, dynamic>;
     _taskController.text = data['title'] ?? '';
+    final theme = Theme.of(context);
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
         title: const Text("Edit Task"),
         content: TextField(
           controller: _taskController,
           autofocus: true,
+          style: TextStyle(color: theme.colorScheme.onSurface),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.colorScheme.surfaceVariant,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
         ),
         actions: [
           TextButton(

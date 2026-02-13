@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../utils/app_theme.dart';
 import '../services/gemini_service.dart';
 import 'goal_task_screen.dart';
 
@@ -23,6 +24,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
       );
     }
 
+    final theme = Theme.of(context);
+    final brightness = theme.brightness;
+    final isDark = brightness == Brightness.dark;
+
     final goalsRef = FirebaseFirestore.instance
         .collection('users')
         .doc(user!.uid)
@@ -30,95 +35,136 @@ class _GoalsScreenState extends State<GoalsScreen> {
         .orderBy('createdAt', descending: true);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text("My Goals"),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        centerTitle: true,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF6C63FF),
+        backgroundColor: theme.colorScheme.primary,
         child: const Icon(Icons.add),
         onPressed: _showAddGoalDialog,
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: goalsRef.snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: AppTheme.auroraBackgroundGradient(brightness),
+        ),
+        child: StreamBuilder<QuerySnapshot>(
+          stream: goalsRef.snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          final goals = snapshot.data!.docs;
+            final goals = snapshot.data!.docs;
 
-          if (goals.isEmpty) {
-            return const Center(
-              child: Text(
-                "No goals yet.\nTap + to create one.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
-              ),
-            );
-          }
-
-          return FutureBuilder<List<GoalModel>>(
-            future: _computeGoals(goals),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final active = snapshot.data!
-                  .where((g) => !g.isCompleted)
-                  .toList()
-                ..sort((a, b) => a.progress.compareTo(b.progress));
-
-              final completed =
-                  snapshot.data!.where((g) => g.isCompleted).toList();
-
-              return ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  _sectionHeader("Active Goals"),
-                  const SizedBox(height: 12),
-                  if (active.isEmpty)
-                    const Text("No active goals.",
-                        style: TextStyle(color: Colors.grey)),
-                  ...active.map(_buildGoalCard),
-                  const SizedBox(height: 30),
-                  _sectionHeader("Completed Goals"),
-                  const SizedBox(height: 12),
-                  if (completed.isEmpty)
-                    const Text("Finish a goal to see it here.",
-                        style: TextStyle(color: Colors.grey)),
-                  ...completed.map(_buildGoalCard),
-                ],
+            if (goals.isEmpty) {
+              return const Center(
+                child: Text(
+                  "No goals yet.\nTap + to create one.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
               );
-            },
-          );
-        },
+            }
+
+            return FutureBuilder<List<GoalModel>>(
+              future: _computeGoals(goals),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final active = snapshot.data!
+                    .where((g) => !g.isCompleted)
+                    .toList()
+                  ..sort((a, b) => a.progress.compareTo(b.progress));
+
+                final completed =
+                    snapshot.data!.where((g) => g.isCompleted).toList();
+
+                return ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    _sectionHeader("Active Goals"),
+                    const SizedBox(height: 12),
+                    if (active.isEmpty)
+                      Text(
+                        "No active goals.",
+                        style: TextStyle(
+                          color: theme.textTheme.bodySmall?.color
+                                  ?.withOpacity(0.6) ??
+                              Colors.grey,
+                        ),
+                      ),
+                    ...active.map(_buildGoalCard),
+                    const SizedBox(height: 30),
+                    _sectionHeader("Completed Goals"),
+                    const SizedBox(height: 12),
+                    if (completed.isEmpty)
+                      Text(
+                        "Finish a goal to see it here.",
+                        style: TextStyle(
+                          color: theme.textTheme.bodySmall?.color
+                                  ?.withOpacity(0.6) ??
+                              Colors.grey,
+                        ),
+                      ),
+                    ...completed.map(_buildGoalCard),
+                  ],
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _sectionHeader(String text) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: theme.textTheme.bodyMedium?.copyWith(
           fontWeight: FontWeight.bold,
-          color: Colors.black87,
+          color: theme.colorScheme.onSurface,
         ),
       ),
     );
   }
 
   Widget _buildGoalCard(GoalModel goal) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final activeGradient = LinearGradient(
+      colors: isDark
+          ? [
+              theme.colorScheme.primary.withOpacity(0.9),
+              theme.colorScheme.secondary.withOpacity(0.85),
+            ]
+          : const [
+              Color(0xFF6C63FF),
+              Color(0xFF00C6FF),
+            ],
+    );
+    final completedGradient = LinearGradient(
+      colors: isDark
+          ? [
+              theme.colorScheme.surfaceVariant,
+              theme.colorScheme.surface,
+            ]
+          : const [Colors.grey, Colors.blueGrey],
+    );
+
     return Dismissible(
       key: Key(goal.id),
       direction: DismissDirection.endToStart,
@@ -180,15 +226,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
             },
             child: Ink(
               decoration: BoxDecoration(
-                gradient: goal.isCompleted
-                    ? const LinearGradient(
-                        colors: [Colors.grey, Colors.blueGrey])
-                    : const LinearGradient(
-                        colors: [
-                          Color(0xFF6C63FF),
-                          Color(0xFF00C6FF),
-                        ],
-                      ),
+                gradient: goal.isCompleted ? completedGradient : activeGradient,
                 borderRadius: BorderRadius.circular(24),
               ),
               padding: const EdgeInsets.all(18),

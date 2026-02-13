@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_theme.dart';
 
 class FocusScreen extends StatefulWidget {
@@ -12,7 +13,7 @@ class FocusScreen extends StatefulWidget {
 }
 
 class _FocusScreenState extends State<FocusScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _glowController;
   late AnimationController _pulseController;
   late AnimationController _scaleController;
@@ -31,9 +32,22 @@ class _FocusScreenState extends State<FocusScreen>
   String? _selectedGoalTitle;
   int _sessionsCompleted = 0;
 
+  static const String _prefsKeyFocusDuration = 'focus_focusDuration';
+  static const String _prefsKeyRestDuration = 'focus_restDuration';
+  static const String _prefsKeyIsActive = 'focus_isActive';
+  static const String _prefsKeyIsFocusSession = 'focus_isFocusSession';
+  static const String _prefsKeyRemainingSeconds = 'focus_remainingSeconds';
+  static const String _prefsKeyLastUpdatedMs = 'focus_lastUpdatedMs';
+  static const String _prefsKeySessionsCompleted = 'focus_sessionsCompleted';
+  static const String _prefsKeySelectedTaskId = 'focus_selectedTaskId';
+  static const String _prefsKeySelectedTaskTitle = 'focus_selectedTaskTitle';
+  static const String _prefsKeySelectedGoalId = 'focus_selectedGoalId';
+  static const String _prefsKeySelectedGoalTitle = 'focus_selectedGoalTitle';
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
@@ -53,16 +67,110 @@ class _FocusScreenState extends State<FocusScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
+
+    _loadFocusState();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _persistFocusState();
     _timer?.cancel();
     _glowController.dispose();
     _pulseController.dispose();
     _scaleController.dispose();
     _characterController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _persistFocusState();
+    }
+  }
+
+  int _remainingSeconds() => (_minutes * 60) + _seconds;
+
+  void _applyRemainingSeconds(int totalSeconds) {
+    final safeSeconds = totalSeconds < 0 ? 0 : totalSeconds;
+    _minutes = safeSeconds ~/ 60;
+    _seconds = safeSeconds % 60;
+  }
+
+  Future<void> _loadFocusState() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+
+    final wasActive = prefs.getBool(_prefsKeyIsActive) ?? false;
+    final savedRemaining =
+        prefs.getInt(_prefsKeyRemainingSeconds) ?? _remainingSeconds();
+    final lastUpdated = prefs.getInt(_prefsKeyLastUpdatedMs);
+
+    setState(() {
+      _focusDuration = prefs.getInt(_prefsKeyFocusDuration) ?? _focusDuration;
+      _restDuration = prefs.getInt(_prefsKeyRestDuration) ?? _restDuration;
+      _isFocusSession =
+          prefs.getBool(_prefsKeyIsFocusSession) ?? _isFocusSession;
+      _sessionsCompleted =
+          prefs.getInt(_prefsKeySessionsCompleted) ?? _sessionsCompleted;
+      _selectedTaskId = prefs.getString(_prefsKeySelectedTaskId);
+      _selectedTaskTitle =
+          prefs.getString(_prefsKeySelectedTaskTitle) ?? _selectedTaskTitle;
+      _selectedGoalId = prefs.getString(_prefsKeySelectedGoalId);
+      _selectedGoalTitle = prefs.getString(_prefsKeySelectedGoalTitle);
+      _applyRemainingSeconds(savedRemaining);
+      _isActive = false;
+    });
+
+    if (wasActive) {
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final elapsedSeconds =
+          lastUpdated == null ? 0 : ((nowMs - lastUpdated) / 1000).floor();
+      final adjustedRemaining = savedRemaining - elapsedSeconds;
+      if (adjustedRemaining <= 0) {
+        setState(() {
+          _applyRemainingSeconds(0);
+        });
+        return;
+      }
+
+      setState(() {
+        _applyRemainingSeconds(adjustedRemaining);
+      });
+      _startTimer();
+    }
+  }
+
+  Future<void> _persistFocusState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_prefsKeyFocusDuration, _focusDuration);
+    await prefs.setInt(_prefsKeyRestDuration, _restDuration);
+    await prefs.setBool(_prefsKeyIsActive, _isActive);
+    await prefs.setBool(_prefsKeyIsFocusSession, _isFocusSession);
+    await prefs.setInt(_prefsKeyRemainingSeconds, _remainingSeconds());
+    await prefs.setInt(
+      _prefsKeyLastUpdatedMs,
+      DateTime.now().millisecondsSinceEpoch,
+    );
+    await prefs.setInt(_prefsKeySessionsCompleted, _sessionsCompleted);
+    if (_selectedTaskId != null) {
+      await prefs.setString(_prefsKeySelectedTaskId, _selectedTaskId!);
+    } else {
+      await prefs.remove(_prefsKeySelectedTaskId);
+    }
+    await prefs.setString(_prefsKeySelectedTaskTitle, _selectedTaskTitle);
+    if (_selectedGoalId != null) {
+      await prefs.setString(_prefsKeySelectedGoalId, _selectedGoalId!);
+    } else {
+      await prefs.remove(_prefsKeySelectedGoalId);
+    }
+    if (_selectedGoalTitle != null) {
+      await prefs.setString(_prefsKeySelectedGoalTitle, _selectedGoalTitle!);
+    } else {
+      await prefs.remove(_prefsKeySelectedGoalTitle);
+    }
   }
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _goalsWithPending(
@@ -117,6 +225,7 @@ class _FocusScreenState extends State<FocusScreen>
     setState(() {
       _isActive = true;
     });
+    _persistFocusState();
 
     _timer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (!_isActive) return;
@@ -143,6 +252,7 @@ class _FocusScreenState extends State<FocusScreen>
     setState(() {
       _isActive = false;
     });
+    _persistFocusState();
   }
 
   void _resetTimer() {
@@ -152,6 +262,7 @@ class _FocusScreenState extends State<FocusScreen>
       _minutes = _focusDuration;
       _seconds = 0;
     });
+    _persistFocusState();
   }
 
   void _completeSession() {
@@ -176,6 +287,7 @@ class _FocusScreenState extends State<FocusScreen>
         'Ready for another focus session?',
       );
     }
+    _persistFocusState();
   }
 
   void _showGoalSelection(String uid) {
@@ -281,6 +393,7 @@ class _FocusScreenState extends State<FocusScreen>
                 _minutes = _isFocusSession ? _focusDuration : _restDuration;
                 _seconds = 0;
               });
+              _persistFocusState();
               Navigator.pop(context);
             },
             child: const Text('Save'),
@@ -976,6 +1089,7 @@ class _FocusScreenState extends State<FocusScreen>
                                 _selectedGoalId = goalId;
                                 _selectedGoalTitle = goalTitle;
                               });
+                              _persistFocusState();
                               Navigator.pop(context);
                             },
                           );
@@ -1042,6 +1156,7 @@ class _FocusScreenState extends State<FocusScreen>
         _selectedTaskTitle = 'No task selected';
         _selectedGoalTitle = null;
       });
+      _persistFocusState();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Task marked as done. Great job!')),
