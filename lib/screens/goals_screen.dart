@@ -61,9 +61,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
             );
           }
 
-          return FutureBuilder(
+          return FutureBuilder<List<GoalModel>>(
             future: _computeGoals(goals),
-            builder: (context, AsyncSnapshot<List<GoalModel>> snapshot) {
+            builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
@@ -140,8 +140,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
             content: const Text("This will permanently delete this goal."),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text("Cancel")),
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Cancel"),
+              ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -161,8 +162,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
           borderRadius: BorderRadius.circular(24),
           child: InkWell(
             borderRadius: BorderRadius.circular(24),
-            onTap: () {
-              Navigator.push(
+            onTap: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => GoalTaskScreen(
@@ -171,6 +172,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   ),
                 ),
               );
+
+              // 🔥 FORCE REBUILD WHEN RETURNING
+              if (mounted) {
+                setState(() {});
+              }
             },
             child: Ink(
               decoration: BoxDecoration(
@@ -293,7 +299,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
                       controller: titleController,
                       decoration: InputDecoration(
                         hintText: "e.g. Launch my portfolio website",
-                        hintStyle: TextStyle(color: Colors.grey.shade400),
                         filled: true,
                         fillColor: Colors.grey.shade100,
                         border: OutlineInputBorder(
@@ -306,19 +311,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
                     const Text("Description (Optional)",
                         style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
-                    Text(
-                      "Describe your goal for better and more specific task generation.",
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                    ),
-                    const SizedBox(height: 8),
                     TextField(
                       controller: descriptionController,
                       maxLines: 4,
                       decoration: InputDecoration(
-                        hintText:
-                            "Include deadlines, constraints, or specific outcomes...",
-                        hintStyle: TextStyle(color: Colors.grey.shade400),
                         filled: true,
                         fillColor: Colors.grey.shade100,
                         border: OutlineInputBorder(
@@ -369,14 +365,12 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                   setDialogState(() => isLoading = true);
 
                                   try {
-                                    // 🔥 Generate AI FIRST
                                     final tasks =
                                         await GeminiService().generateTasks(
                                       goalTitle: title,
                                       description: description,
                                     );
 
-                                    // 🔥 Create Goal AFTER tasks ready
                                     final goalDoc = await FirebaseFirestore
                                         .instance
                                         .collection('users')
