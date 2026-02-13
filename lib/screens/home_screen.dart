@@ -109,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   return CustomScrollView(
                     slivers: [
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
                         sliver: SliverToBoxAdapter(
                           child: Text(
                             'Hello, ${_greetingName(user)}',

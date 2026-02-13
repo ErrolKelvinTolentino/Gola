@@ -433,10 +433,24 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
           style: TextStyle(color: theme.colorScheme.onSurface),
           decoration: InputDecoration(
             filled: true,
-            fillColor: theme.colorScheme.surfaceVariant,
+            fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.9),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+              borderSide: BorderSide(
+                color: theme.colorScheme.onSurface.withOpacity(0.18),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: theme.colorScheme.onSurface.withOpacity(0.12),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: theme.colorScheme.primary.withOpacity(0.4),
+              ),
             ),
           ),
         ),
@@ -470,10 +484,24 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
           style: TextStyle(color: theme.colorScheme.onSurface),
           decoration: InputDecoration(
             filled: true,
-            fillColor: theme.colorScheme.surfaceVariant,
+            fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.9),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+              borderSide: BorderSide(
+                color: theme.colorScheme.onSurface.withOpacity(0.18),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: theme.colorScheme.onSurface.withOpacity(0.12),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: theme.colorScheme.primary.withOpacity(0.4),
+              ),
             ),
           ),
         ),

@@ -309,7 +309,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
       builder: (_) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final theme = Theme.of(context);
             return Dialog(
+              backgroundColor: theme.colorScheme.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(28),
               ),
@@ -319,45 +321,102 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       "✨ Create a New Goal",
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
+                    Text(
                       "Break your ambition into actionable steps.",
-                      style: TextStyle(color: Colors.grey, fontSize: 13),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.textTheme.bodySmall?.color
+                                ?.withOpacity(0.7) ??
+                            Colors.grey,
+                      ),
                     ),
                     const SizedBox(height: 24),
-                    const Text("Goal Title",
-                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text(
+                      "Goal Title",
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     TextField(
                       controller: titleController,
+                      style: TextStyle(color: theme.colorScheme.onSurface),
                       decoration: InputDecoration(
                         hintText: "e.g. Launch my portfolio website",
+                        hintStyle: TextStyle(
+                          color: theme.textTheme.bodySmall?.color
+                                  ?.withOpacity(0.6) ??
+                              Colors.grey,
+                        ),
                         filled: true,
-                        fillColor: Colors.grey.shade100,
+                        fillColor:
+                            theme.colorScheme.surfaceVariant.withOpacity(0.9),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
+                          borderSide: BorderSide(
+                            color:
+                                theme.colorScheme.onSurface.withOpacity(0.18),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color:
+                                theme.colorScheme.onSurface.withOpacity(0.12),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.primary.withOpacity(0.4),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 18),
-                    const Text("Description (Optional)",
-                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text(
+                      "Description (Optional)",
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     TextField(
                       controller: descriptionController,
                       maxLines: 4,
+                      style: TextStyle(color: theme.colorScheme.onSurface),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: Colors.grey.shade100,
+                        fillColor:
+                            theme.colorScheme.surfaceVariant.withOpacity(0.9),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
+                          borderSide: BorderSide(
+                            color:
+                                theme.colorScheme.onSurface.withOpacity(0.18),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color:
+                                theme.colorScheme.onSurface.withOpacity(0.12),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.primary.withOpacity(0.4),
+                          ),
                         ),
                       ),
                     ),

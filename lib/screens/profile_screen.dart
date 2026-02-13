@@ -122,6 +122,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final displayEmail = _email ?? 'Email';
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profile'),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: theme.colorScheme.onSurface,
+      ),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -129,7 +136,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.only(top: 20, bottom: 30),
+                padding: const EdgeInsets.only(top: 8, bottom: 26),
                 child: Center(
                   child: Column(
                     children: [

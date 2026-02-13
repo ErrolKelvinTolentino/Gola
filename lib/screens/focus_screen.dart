@@ -39,6 +39,7 @@ class _FocusScreenState extends State<FocusScreen>
   static const String _prefsKeyRemainingSeconds = 'focus_remainingSeconds';
   static const String _prefsKeyLastUpdatedMs = 'focus_lastUpdatedMs';
   static const String _prefsKeySessionsCompleted = 'focus_sessionsCompleted';
+  static const String _prefsKeySessionResetDate = 'focus_sessionResetDate';
   static const String _prefsKeySelectedTaskId = 'focus_selectedTaskId';
   static const String _prefsKeySelectedTaskTitle = 'focus_selectedTaskTitle';
   static const String _prefsKeySelectedGoalId = 'focus_selectedGoalId';
@@ -103,6 +104,10 @@ class _FocusScreenState extends State<FocusScreen>
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
 
+    final todayKey = _dayKey(DateTime.now());
+    final lastReset = prefs.getString(_prefsKeySessionResetDate);
+    final shouldResetSessions = lastReset == null || lastReset != todayKey;
+
     final wasActive = prefs.getBool(_prefsKeyIsActive) ?? false;
     final savedRemaining =
         prefs.getInt(_prefsKeyRemainingSeconds) ?? _remainingSeconds();
@@ -113,8 +118,9 @@ class _FocusScreenState extends State<FocusScreen>
       _restDuration = prefs.getInt(_prefsKeyRestDuration) ?? _restDuration;
       _isFocusSession =
           prefs.getBool(_prefsKeyIsFocusSession) ?? _isFocusSession;
-      _sessionsCompleted =
-          prefs.getInt(_prefsKeySessionsCompleted) ?? _sessionsCompleted;
+      _sessionsCompleted = shouldResetSessions
+          ? 0
+          : (prefs.getInt(_prefsKeySessionsCompleted) ?? _sessionsCompleted);
       _selectedTaskId = prefs.getString(_prefsKeySelectedTaskId);
       _selectedTaskTitle =
           prefs.getString(_prefsKeySelectedTaskTitle) ?? _selectedTaskTitle;
@@ -123,6 +129,11 @@ class _FocusScreenState extends State<FocusScreen>
       _applyRemainingSeconds(savedRemaining);
       _isActive = false;
     });
+
+    if (shouldResetSessions) {
+      await prefs.setInt(_prefsKeySessionsCompleted, 0);
+      await prefs.setString(_prefsKeySessionResetDate, todayKey);
+    }
 
     if (wasActive) {
       final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -145,6 +156,7 @@ class _FocusScreenState extends State<FocusScreen>
 
   Future<void> _persistFocusState() async {
     final prefs = await SharedPreferences.getInstance();
+    final todayKey = _dayKey(DateTime.now());
     await prefs.setInt(_prefsKeyFocusDuration, _focusDuration);
     await prefs.setInt(_prefsKeyRestDuration, _restDuration);
     await prefs.setBool(_prefsKeyIsActive, _isActive);
@@ -155,6 +167,7 @@ class _FocusScreenState extends State<FocusScreen>
       DateTime.now().millisecondsSinceEpoch,
     );
     await prefs.setInt(_prefsKeySessionsCompleted, _sessionsCompleted);
+    await prefs.setString(_prefsKeySessionResetDate, todayKey);
     if (_selectedTaskId != null) {
       await prefs.setString(_prefsKeySelectedTaskId, _selectedTaskId!);
     } else {
@@ -171,6 +184,13 @@ class _FocusScreenState extends State<FocusScreen>
     } else {
       await prefs.remove(_prefsKeySelectedGoalTitle);
     }
+  }
+
+  String _dayKey(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
   }
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _goalsWithPending(
@@ -442,6 +462,7 @@ class _FocusScreenState extends State<FocusScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      const SizedBox(height: 12),
                       Wrap(
                         spacing: 12,
                         runSpacing: 12,
