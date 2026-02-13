@@ -482,7 +482,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                     final batch =
                                         FirebaseFirestore.instance.batch();
 
-                                    for (final task in tasks) {
+                                    for (int i = 0; i < tasks.length; i++) {
+                                      final task = tasks[i];
                                       batch.set(
                                         goalDoc.collection('tasks').doc(),
                                         {
@@ -490,6 +491,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                           'isCompleted': false,
                                           'createdAt':
                                               FieldValue.serverTimestamp(),
+                                          'order': i,
                                         },
                                       );
                                     }

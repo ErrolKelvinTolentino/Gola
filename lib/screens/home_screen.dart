@@ -220,7 +220,22 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         gradient: _heroGradient(theme),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1,
+        ),
         boxShadow: AppTheme.softShadow(theme.brightness),
+      ),
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.16),
+            Colors.transparent,
+          ],
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
