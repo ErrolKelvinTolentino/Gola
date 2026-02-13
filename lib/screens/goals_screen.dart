@@ -15,6 +15,18 @@ class GoalsScreen extends StatefulWidget {
 
 class _GoalsScreenState extends State<GoalsScreen> {
   final user = FirebaseAuth.instance.currentUser;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  GoalSort _sort = GoalSort.newest;
+  final Map<String, bool> _pinOverrides = {};
+  Future<List<GoalModel>>? _goalsFuture;
+  String _goalsSignature = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,24 +83,34 @@ class _GoalsScreenState extends State<GoalsScreen> {
               );
             }
 
+            _syncPinOverrides(goals);
+
+            final signature = _goalsSignatureFor(goals);
+            if (signature != _goalsSignature) {
+              _goalsSignature = signature;
+              _goalsFuture = _computeGoals(goals);
+            }
+
             return FutureBuilder<List<GoalModel>>(
-              future: _computeGoals(goals),
+              future: _goalsFuture,
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final active = snapshot.data!
-                    .where((g) => !g.isCompleted)
-                    .toList()
-                  ..sort((a, b) => a.progress.compareTo(b.progress));
+                final active = _applySortAndFilter(
+                  snapshot.data!.where((g) => !g.isCompleted).toList(),
+                );
 
-                final completed =
-                    snapshot.data!.where((g) => g.isCompleted).toList();
+                final completed = _applySortAndFilter(
+                  snapshot.data!.where((g) => g.isCompleted).toList(),
+                );
 
                 return ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
+                    _buildSearchAndSort(theme),
+                    const SizedBox(height: 16),
                     _sectionHeader("Active Goals"),
                     const SizedBox(height: 12),
                     if (active.isEmpty)
@@ -122,6 +144,178 @@ class _GoalsScreenState extends State<GoalsScreen> {
         ),
       ),
     );
+  }
+
+  void _syncPinOverrides(List<QueryDocumentSnapshot> goals) {
+    for (final goal in goals) {
+      final data = goal.data() as Map<String, dynamic>;
+      final serverPinned = data['pinned'] == true;
+      final override = _pinOverrides[goal.id];
+      if (override != null && override == serverPinned) {
+        _pinOverrides.remove(goal.id);
+      }
+    }
+  }
+
+  void _invalidateGoalsCache() {
+    _goalsSignature = '';
+    _goalsFuture = null;
+  }
+
+  String _goalsSignatureFor(List<QueryDocumentSnapshot> goals) {
+    final buffer = StringBuffer();
+    for (final goal in goals) {
+      final data = goal.data() as Map<String, dynamic>;
+      buffer
+        ..write(goal.id)
+        ..write('|')
+        ..write(data['title'] ?? '')
+        ..write('|')
+        ..write(data['pinned'] == true ? '1' : '0')
+        ..write('|')
+        ..write(data['createdAt'] is Timestamp
+            ? (data['createdAt'] as Timestamp).millisecondsSinceEpoch
+            : 0)
+        ..write(';');
+    }
+    return buffer.toString();
+  }
+
+  Widget _buildSearchAndSort(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.trim().toLowerCase();
+                });
+              },
+              style: TextStyle(color: theme.colorScheme.onSurface),
+              decoration: InputDecoration(
+                hintText: 'Search goals',
+                hintStyle: TextStyle(
+                  color: theme.textTheme.bodySmall?.color?.withOpacity(0.6) ??
+                      Colors.grey,
+                ),
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          _buildSortMenu(theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortMenu(ThemeData theme) {
+    return PopupMenuButton<GoalSort>(
+      tooltip: 'Sort goals',
+      onSelected: (value) {
+        setState(() {
+          _sort = value;
+        });
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: GoalSort.newest,
+          child: Text('Newest first'),
+        ),
+        PopupMenuItem(
+          value: GoalSort.oldest,
+          child: Text('Oldest first'),
+        ),
+        PopupMenuItem(
+          value: GoalSort.titleAsc,
+          child: Text('Title A-Z'),
+        ),
+        PopupMenuItem(
+          value: GoalSort.progressDesc,
+          child: Text('Progress high-low'),
+        ),
+        PopupMenuItem(
+          value: GoalSort.progressAsc,
+          child: Text('Progress low-high'),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.sort, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              _sortLabel(_sort),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _sortLabel(GoalSort sort) {
+    switch (sort) {
+      case GoalSort.newest:
+        return 'Newest';
+      case GoalSort.oldest:
+        return 'Oldest';
+      case GoalSort.titleAsc:
+        return 'Title';
+      case GoalSort.progressDesc:
+        return 'Progress';
+      case GoalSort.progressAsc:
+        return 'Progress';
+    }
+  }
+
+  List<GoalModel> _applySortAndFilter(List<GoalModel> goals) {
+    final filtered = _searchQuery.isEmpty
+        ? goals
+        : goals
+            .where((g) => g.title.toLowerCase().contains(_searchQuery))
+            .toList();
+
+    filtered.sort((a, b) {
+      if (a.isPinned != b.isPinned) {
+        return a.isPinned ? -1 : 1;
+      }
+
+      switch (_sort) {
+        case GoalSort.newest:
+          return b.createdAt.compareTo(a.createdAt);
+        case GoalSort.oldest:
+          return a.createdAt.compareTo(b.createdAt);
+        case GoalSort.titleAsc:
+          return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+        case GoalSort.progressDesc:
+          return b.progress.compareTo(a.progress);
+        case GoalSort.progressAsc:
+          return a.progress.compareTo(b.progress);
+      }
+    });
+
+    return filtered;
   }
 
   Widget _sectionHeader(String text) {
@@ -221,6 +415,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
               // 🔥 FORCE REBUILD WHEN RETURNING
               if (mounted) {
+                _invalidateGoalsCache();
                 setState(() {});
               }
             },
@@ -233,11 +428,31 @@ class _GoalsScreenState extends State<GoalsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(goal.title,
-                      style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          goal.title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => _togglePin(goal),
+                        icon: Icon(
+                          goal.isPinned
+                              ? Icons.push_pin
+                              : Icons.push_pin_outlined,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        tooltip: goal.isPinned ? 'Unpin' : 'Pin',
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 12),
                   LinearProgressIndicator(
                     value: goal.progress,
@@ -271,9 +486,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
   Future<List<GoalModel>> _computeGoals(
       List<QueryDocumentSnapshot> goals) async {
-    List<GoalModel> result = [];
-
-    for (var goal in goals) {
+    final futures = goals.map((goal) async {
       final tasks = await goal.reference.collection('tasks').get();
 
       final total = tasks.docs.length;
@@ -282,26 +495,34 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
       final progress = total == 0 ? 0.0 : completed / total;
 
-      result.add(
-        GoalModel(
-          id: goal.id,
-          title: goal['title'],
-          ref: goal.reference,
-          total: total,
-          completed: completed,
-          progress: progress,
-          isCompleted: total > 0 && completed == total,
-        ),
-      );
-    }
+      final data = goal.data() as Map<String, dynamic>;
+      final createdAtRaw = data['createdAt'];
+      final createdAt = createdAtRaw is Timestamp
+          ? createdAtRaw.toDate()
+          : DateTime.fromMillisecondsSinceEpoch(0);
+      final pinned = _pinOverrides[goal.id] ?? (data['pinned'] == true);
 
-    return result;
+      return GoalModel(
+        id: goal.id,
+        title: goal['title'],
+        ref: goal.reference,
+        total: total,
+        completed: completed,
+        progress: progress,
+        isCompleted: total > 0 && completed == total,
+        isPinned: pinned,
+        createdAt: createdAt,
+      );
+    });
+
+    return Future.wait(futures);
   }
 
   void _showAddGoalDialog() {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
     bool isLoading = false;
+    bool useAiTasks = true;
 
     showDialog(
       context: context,
@@ -420,6 +641,44 @@ class _GoalsScreenState extends State<GoalsScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            theme.colorScheme.surfaceVariant.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.colorScheme.onSurface.withOpacity(0.08),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Generate tasks with AI',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Switch(
+                            value: useAiTasks,
+                            onChanged: isLoading
+                                ? null
+                                : (value) {
+                                    setDialogState(() {
+                                      useAiTasks = value;
+                                    });
+                                  },
+                          ),
+                        ],
+                      ),
+                    ),
                     if (isLoading) ...[
                       const SizedBox(height: 16),
                       Row(
@@ -462,38 +721,44 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                   setDialogState(() => isLoading = true);
 
                                   try {
-                                    final tasks =
-                                        await GeminiService().generateTasks(
-                                      goalTitle: title,
-                                      description: description,
-                                    );
-
-                                    final goalDoc = await FirebaseFirestore
+                                    final goalCollection = FirebaseFirestore
                                         .instance
                                         .collection('users')
                                         .doc(user!.uid)
-                                        .collection('goals')
-                                        .add({
-                                      'title': title,
-                                      'description': description,
-                                      'createdAt': FieldValue.serverTimestamp(),
-                                    });
+                                        .collection('goals');
 
+                                    final tasks = useAiTasks
+                                        ? await GeminiService().generateTasks(
+                                            goalTitle: title,
+                                            description: description,
+                                          )
+                                        : <String>[];
+
+                                    final goalDoc = goalCollection.doc();
                                     final batch =
                                         FirebaseFirestore.instance.batch();
 
-                                    for (int i = 0; i < tasks.length; i++) {
-                                      final task = tasks[i];
-                                      batch.set(
-                                        goalDoc.collection('tasks').doc(),
-                                        {
-                                          'title': task,
-                                          'isCompleted': false,
-                                          'createdAt':
-                                              FieldValue.serverTimestamp(),
-                                          'order': i,
-                                        },
-                                      );
+                                    batch.set(goalDoc, {
+                                      'title': title,
+                                      'description': description,
+                                      'createdAt': FieldValue.serverTimestamp(),
+                                      'pinned': false,
+                                    });
+
+                                    if (useAiTasks) {
+                                      for (int i = 0; i < tasks.length; i++) {
+                                        final task = tasks[i];
+                                        batch.set(
+                                          goalDoc.collection('tasks').doc(),
+                                          {
+                                            'title': task,
+                                            'isCompleted': false,
+                                            'createdAt':
+                                                FieldValue.serverTimestamp(),
+                                            'order': i,
+                                          },
+                                        );
+                                      }
                                     }
 
                                     await batch.commit();
@@ -535,6 +800,28 @@ class _GoalsScreenState extends State<GoalsScreen> {
       },
     );
   }
+
+  Future<void> _togglePin(GoalModel goal) async {
+    final nextPinned = !goal.isPinned;
+    setState(() {
+      _pinOverrides[goal.id] = nextPinned;
+    });
+
+    try {
+      await goal.ref.update({'pinned': nextPinned});
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _pinOverrides.remove(goal.id);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Pin failed: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 }
 
 class GoalModel {
@@ -545,6 +832,8 @@ class GoalModel {
   final int completed;
   final double progress;
   final bool isCompleted;
+  final bool isPinned;
+  final DateTime createdAt;
 
   GoalModel({
     required this.id,
@@ -554,5 +843,15 @@ class GoalModel {
     required this.completed,
     required this.progress,
     required this.isCompleted,
+    required this.isPinned,
+    required this.createdAt,
   });
+}
+
+enum GoalSort {
+  newest,
+  oldest,
+  titleAsc,
+  progressDesc,
+  progressAsc,
 }

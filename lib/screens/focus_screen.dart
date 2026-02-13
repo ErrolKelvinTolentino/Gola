@@ -247,7 +247,7 @@ class _FocusScreenState extends State<FocusScreen>
     });
     _persistFocusState();
 
-    _timer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!_isActive) return;
 
       final currentTotalSeconds = _minutes * 60 + _seconds;

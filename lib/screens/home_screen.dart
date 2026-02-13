@@ -58,12 +58,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (displayName != null && displayName.isNotEmpty) {
       return displayName;
     }
-
-    final email = user.email?.trim();
-    if (email != null && email.isNotEmpty && email.contains('@')) {
+    final email = user.email;
+    if (email != null && email.contains('@')) {
       return email.split('@').first;
     }
-
     return 'there';
   }
 
@@ -89,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
             stream: _goalsStream(user.uid),
             builder: (context, goalSnapshot) {
               if (goalSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return _buildLoadingLayout(theme, user);
               }
 
               final goals = goalSnapshot.data?.docs ?? [];
@@ -97,10 +95,14 @@ class _HomeScreenState extends State<HomeScreen> {
               return FutureBuilder<Map<String, int>>(
                 future: _calculateStats(user.uid, goals),
                 builder: (context, snapshot) {
-                  final totalTasks = snapshot.data?['totalTasks'] ?? 0;
-                  final completedTasks = snapshot.data?['completedTasks'] ?? 0;
-                  final completedGoals = snapshot.data?['completedGoals'] ?? 0;
-                  final totalGoals = snapshot.data?['totalGoals'] ?? 0;
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return _buildLoadingLayout(theme, user);
+                  }
+
+                  final totalTasks = snapshot.data!['totalTasks']!;
+                  final completedTasks = snapshot.data!['completedTasks']!;
+                  final completedGoals = snapshot.data!['completedGoals']!;
+                  final totalGoals = snapshot.data!['totalGoals']!;
 
                   final remainingTasks = totalTasks - completedTasks;
                   final progress =
@@ -209,6 +211,56 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildLoadingLayout(ThemeData theme, User user) {
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+          sliver: SliverToBoxAdapter(
+            child: Text(
+              'Hello, ${_greetingName(user)}',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          sliver: SliverToBoxAdapter(
+            child: Container(
+              height: 120,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                color: AppTheme.surfaceFor(theme.brightness).withOpacity(0.4),
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 200,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.1,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  color: AppTheme.surfaceFor(theme.brightness).withOpacity(0.4),
+                ),
+              ),
+              childCount: 4,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildHeroHeader(
     ThemeData theme,
     int completedTasks,
@@ -220,28 +272,13 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         gradient: _heroGradient(theme),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 1,
-        ),
         boxShadow: AppTheme.softShadow(theme.brightness),
-      ),
-      foregroundDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.16),
-            Colors.transparent,
-          ],
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Today’s progress',
+            'Your Progress',
             style: theme.textTheme.titleLarge?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w800,
@@ -289,26 +326,15 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Icon(icon, color: accent),
           const Spacer(),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+          Text(
+            value,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
             ),
           ),
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium,
-          ),
+          Text(title, style: theme.textTheme.bodyMedium),
           Text(
             subtitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.textTheme.bodySmall?.color?.withOpacity(0.6),
             ),
