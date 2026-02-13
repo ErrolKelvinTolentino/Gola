@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class GeminiService {
   // TODO: Replace with your NEW, SECURE API Key
-  static const String apiKey = 'AIzaSyBvnfZrh9wsbnWInXHqarT7b5VRP2q6HNw';
+  static const String apiKey = 'AIzaSyDswsyFeURmFBgHLhkPMQubaEfgND8ZXpE';
 
   // The model we are trying to use
   static const String model = 'gemini-2.5-flash';

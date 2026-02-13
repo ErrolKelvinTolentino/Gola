@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../services/gemini_service.dart';
 
 class GoalTaskScreen extends StatefulWidget {
   final String goalId;
@@ -19,7 +18,7 @@ class GoalTaskScreen extends StatefulWidget {
 }
 
 class _GoalTaskScreenState extends State<GoalTaskScreen> {
-  bool _isLoading = false;
+  final TextEditingController _taskController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -41,22 +40,12 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
         elevation: 0,
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isLoading ? null : _generateTasks,
-        icon: _isLoading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(Icons.auto_awesome),
-        label: Text(_isLoading ? "Generating..." : "AI Plan"),
+        onPressed: _showAddTaskDialog,
+        icon: const Icon(Icons.add),
+        label: const Text("Add Task"),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // ✅ FIXED ORDERING HERE
-        stream: tasksRef.orderBy('createdAt', descending: false).snapshots(),
+        stream: tasksRef.snapshots(), // 🔥 DO NOT orderBy here
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -64,32 +53,26 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
 
           final docs = snapshot.data!.docs;
 
-          final active =
-              docs.where((d) => (d['isCompleted'] ?? false) == false).toList();
+          if (docs.isEmpty) {
+            return const Center(child: Text("No tasks yet"));
+          }
 
-          final completed =
-              docs.where((d) => (d['isCompleted'] ?? false) == true).toList();
+          // 🔥 SAFE SORTING (handles old tasks without 'order')
+          docs.sort((a, b) {
+            final aOrder =
+                (a.data() as Map<String, dynamic>)['order'] ?? 999999;
+            final bOrder =
+                (b.data() as Map<String, dynamic>)['order'] ?? 999999;
+            return aOrder.compareTo(bOrder);
+          });
 
-          return ListView(
+          return ReorderableListView(
             padding: const EdgeInsets.all(20),
+            onReorder: (oldIndex, newIndex) =>
+                _onReorder(docs, oldIndex, newIndex),
             children: [
-              if (active.isNotEmpty) ...[
-                const Text(
-                  "Active",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                ...active.map((task) => _taskTile(task, false)),
-                const SizedBox(height: 30),
-              ],
-              if (completed.isNotEmpty) ...[
-                const Text(
-                  "Completed",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                ...completed.map((task) => _taskTile(task, true)),
-              ],
+              for (int i = 0; i < docs.length; i++)
+                _taskTile(docs[i], Key(docs[i].id)),
             ],
           );
         },
@@ -97,10 +80,33 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
     );
   }
 
-  Widget _taskTile(QueryDocumentSnapshot task, bool isCompleted) {
+  // 🔁 DRAG REORDER
+  Future<void> _onReorder(
+      List<QueryDocumentSnapshot> docs, int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+
+    final newDocs = List.from(docs);
+    final item = newDocs.removeAt(oldIndex);
+    newDocs.insert(newIndex, item);
+
+    final batch = FirebaseFirestore.instance.batch();
+
+    for (int i = 0; i < newDocs.length; i++) {
+      batch.update(newDocs[i].reference, {
+        'order': i,
+      });
+    }
+
+    await batch.commit();
+  }
+
+  // 🧩 TASK TILE
+  Widget _taskTile(QueryDocumentSnapshot task, Key key) {
     final data = task.data() as Map<String, dynamic>;
+    final isCompleted = data['isCompleted'] ?? false;
 
     return Card(
+      key: key,
       elevation: 4,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
@@ -122,14 +128,131 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
             decoration: isCompleted ? TextDecoration.lineThrough : null,
           ),
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete, color: Colors.red),
-          onPressed: () => _confirmDelete(task),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ✏ EDIT
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.blue),
+              onPressed: () => _showEditDialog(task),
+            ),
+            // 🗑 DELETE
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () => _confirmDelete(task),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  // ➕ SHOW ADD DIALOG
+  void _showAddTaskDialog() {
+    _taskController.clear();
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Add New Task"),
+        content: TextField(
+          controller: _taskController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: "Enter task...",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: _addTask,
+            child: const Text("Add"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔥 ADD TASK AT TOP
+  Future<void> _addTask() async {
+    final text = _taskController.text.trim();
+    if (text.isEmpty) return;
+
+    final user = FirebaseAuth.instance.currentUser!;
+
+    final tasksRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('goals')
+        .doc(widget.goalId)
+        .collection('tasks');
+
+    final snapshot = await tasksRef.get();
+    final batch = FirebaseFirestore.instance.batch();
+
+    // Shift existing tasks down
+    for (final doc in snapshot.docs) {
+      final currentOrder = (doc.data() as Map<String, dynamic>)['order'] ?? 0;
+
+      batch.update(doc.reference, {
+        'order': currentOrder + 1,
+      });
+    }
+
+    // Add new task at top (order 0)
+    final newDoc = tasksRef.doc();
+    batch.set(newDoc, {
+      'title': text,
+      'isCompleted': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      'order': 0,
+    });
+
+    await batch.commit();
+
+    if (mounted) Navigator.pop(context);
+  }
+
+  // ✏ EDIT TASK
+  void _showEditDialog(QueryDocumentSnapshot task) {
+    final data = task.data() as Map<String, dynamic>;
+    _taskController.text = data['title'];
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Edit Task"),
+        content: TextField(
+          controller: _taskController,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final text = _taskController.text.trim();
+              if (text.isEmpty) return;
+
+              await task.reference.update({
+                'title': text,
+              });
+
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🗑 DELETE CONFIRM
   void _confirmDelete(QueryDocumentSnapshot task) {
     showDialog(
       context: context,
@@ -153,44 +276,5 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _generateTasks() async {
-    setState(() => _isLoading = true);
-
-    final user = FirebaseAuth.instance.currentUser!;
-
-    final tasksRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('goals')
-        .doc(widget.goalId)
-        .collection('tasks');
-
-    try {
-      final tasks =
-          await GeminiService().generateTasks(goalTitle: widget.title);
-
-      final batch = FirebaseFirestore.instance.batch();
-
-      for (final t in tasks) {
-        batch.set(tasksRef.doc(), {
-          'title': t,
-          'isCompleted': false,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-
-      await batch.commit();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error generating tasks: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-
-    if (mounted) setState(() => _isLoading = false);
   }
 }
