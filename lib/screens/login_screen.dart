@@ -13,7 +13,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController();
+  final usernameController = TextEditingController();
   final passwordController = TextEditingController();
   final auth = AuthService();
 
@@ -25,7 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await auth.login(
-        emailController.text.trim(),
+        usernameController.text.trim(),
         passwordController.text.trim(),
       );
 
@@ -41,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       switch (e.code) {
         case 'user-not-found':
-          message = 'No account found for this email.';
+          message = 'No account found for this username.';
           break;
         case 'wrong-password':
           message = 'Incorrect password.';
@@ -122,12 +122,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 48),
 
-                  // 📧 Email Field
+                  // 👤 Username Field
                   _buildModernTextField(
-                    controller: emailController,
-                    hintText: 'Email',
-                    icon: Icons.mail_outline_rounded,
-                    keyboardType: TextInputType.emailAddress,
+                    controller: usernameController,
+                    hintText: 'Username',
+                    icon: Icons.person_outline_rounded,
+                    keyboardType: TextInputType.text,
                   ),
 
                   const SizedBox(height: 16),

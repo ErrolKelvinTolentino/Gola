@@ -11,6 +11,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final emailController = TextEditingController();
+  final usernameController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmController = TextEditingController();
   final auth = AuthService();
@@ -27,12 +28,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
       passwordController.text.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
   bool get isLong => passwordController.text.length >= 8;
 
+  bool get isUsernameValid => RegExp(r'^[a-z0-9_]{3,20}$').hasMatch(
+        usernameController.text.trim().toLowerCase(),
+      );
+
   bool get passwordsMatch =>
       passwordController.text == confirmController.text &&
       confirmController.text.isNotEmpty;
 
   bool get isFormValid =>
-      isUpper && isLower && isNumber && isSpecial && isLong && passwordsMatch;
+      isUsernameValid &&
+      isUpper &&
+      isLower &&
+      isNumber &&
+      isSpecial &&
+      isLong &&
+      passwordsMatch;
 
   // ✅ Requirement indicator widget (IN SCOPE)
   Widget requirement(String text, bool met) {
@@ -67,6 +78,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await auth.register(
         emailController.text.trim(),
         passwordController.text.trim(),
+        usernameController.text.trim(),
       );
       Navigator.pop(context);
     } catch (e) {
@@ -151,6 +163,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     hintText: 'Email',
                     icon: Icons.mail_outline_rounded,
                     keyboardType: TextInputType.emailAddress,
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // 👤 Username
+                  _buildModernTextField(
+                    controller: usernameController,
+                    hintText: 'Username (lowercase, 3-20 chars)',
+                    icon: Icons.person_outline_rounded,
+                    keyboardType: TextInputType.text,
+                    onChanged: (_) => setState(() {}),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ✅ Username requirements
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceFor(
+                        brightness,
+                      ).withOpacity(
+                        brightness == Brightness.dark ? 0.85 : 0.7,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
+                        requirement('3-20 characters', isUsernameValid),
+                        requirement(
+                            'Lowercase letters, numbers, _', isUsernameValid),
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: 20),
