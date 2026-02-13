@@ -30,123 +30,254 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
       );
     }
 
-    final tasksRef = FirebaseFirestore.instance
+    final goalRef = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .collection('goals')
-        .doc(widget.goalId)
-        .collection('tasks');
+        .doc(widget.goalId);
+
+    final tasksRef = goalRef.collection('tasks');
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: Text(widget.title),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'delete') {
+                _confirmDeleteGoal();
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'delete',
+                child: Text(
+                  'Delete Goal',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddTaskDialog,
         icon: const Icon(Icons.add),
         label: const Text("Add Task"),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: tasksRef.snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                "Error:\n${snapshot.error}",
-                textAlign: TextAlign.center,
-              ),
-            );
-          }
-
-          if (!snapshot.hasData) {
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: goalRef.snapshots(),
+        builder: (context, goalSnapshot) {
+          if (!goalSnapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final docs = snapshot.data!.docs;
+          final goalData = goalSnapshot.data!.data() as Map<String, dynamic>?;
+          final description = goalData?['description'] ?? '';
 
-          print("GOAL ID: ${widget.goalId}");
-          print("TOTAL TASKS FOUND: ${docs.length}");
+          return StreamBuilder<QuerySnapshot>(
+            stream: tasksRef.snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text("Error:\n${snapshot.error}"),
+                );
+              }
 
-          if (docs.isEmpty) {
-            return const Center(child: Text("No tasks yet"));
-          }
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          // 🔥 SAFE SORT (no Firestore orderBy dependency)
-          docs.sort((a, b) {
-            final aData = a.data() as Map<String, dynamic>;
-            final bData = b.data() as Map<String, dynamic>;
+              final docs = snapshot.data!.docs;
 
-            final aOrder = aData['order'] ?? 0;
-            final bOrder = bData['order'] ?? 0;
+              docs.sort((a, b) {
+                final aData = a.data() as Map<String, dynamic>;
+                final bData = b.data() as Map<String, dynamic>;
+                final aOrder = aData['order'] ?? 0;
+                final bOrder = bData['order'] ?? 0;
+                return aOrder.compareTo(bOrder);
+              });
 
-            return aOrder.compareTo(bOrder);
-          });
+              final pending = docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                return !(data['isCompleted'] ?? false);
+              }).toList();
 
-          final pending = docs.where((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return !(data['isCompleted'] ?? false);
-          }).toList();
+              final completed = docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                return data['isCompleted'] ?? false;
+              }).toList();
 
-          final completed = docs.where((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return data['isCompleted'] ?? false;
-          }).toList();
+              final total = docs.length;
+              final done = completed.length;
+              final progress = total == 0 ? 0.0 : done / total;
 
-          return ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              if (pending.isNotEmpty) ...[
-                const Text(
-                  "Pending Tasks",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                ReorderableListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  buildDefaultDragHandles: false,
-                  itemCount: pending.length,
-                  onReorder: (oldIndex, newIndex) =>
-                      _onReorder(pending, oldIndex, newIndex),
-                  itemBuilder: (context, index) {
-                    final task = pending[index];
-                    return _taskTile(
-                      task,
-                      ValueKey(task.id),
-                      index,
-                      reorderable: true,
-                    );
-                  },
-                ),
-                const SizedBox(height: 30),
-              ],
-              if (completed.isNotEmpty) ...[
-                const Text(
-                  "Completed Tasks",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                ...completed.map(
-                  (task) => _taskTile(
-                    task,
-                    ValueKey(task.id),
-                    0,
-                    reorderable: false,
-                  ),
-                ),
-              ],
-            ],
+              return ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  _buildGoalCard(description, progress, done, total),
+                  const SizedBox(height: 30),
+                  if (pending.isNotEmpty) ...[
+                    const Text(
+                      "Pending Tasks",
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 10),
+                    ReorderableListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      buildDefaultDragHandles: false,
+                      itemCount: pending.length,
+                      onReorder: (oldIndex, newIndex) =>
+                          _onReorder(pending, oldIndex, newIndex),
+                      itemBuilder: (context, index) {
+                        final task = pending[index];
+                        return _taskTile(
+                          task,
+                          ValueKey(task.id),
+                          index,
+                          reorderable: true,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 30),
+                  ],
+                  if (completed.isNotEmpty) ...[
+                    const Text(
+                      "Completed Tasks",
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 10),
+                    ...completed.map(
+                      (task) => _taskTile(
+                        task,
+                        ValueKey(task.id),
+                        0,
+                        reorderable: false,
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
           );
         },
       ),
     );
   }
 
-  // 🔥 REORDER PENDING ONLY
+  Widget _buildGoalCard(
+      String description, double progress, int done, int total) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 12,
+            color: Colors.black.withOpacity(0.05),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.title,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              description,
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+          ],
+          const SizedBox(height: 20),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              height: 12,
+              color: Colors.grey[300],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 400),
+                      width: constraints.maxWidth * progress,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Color(0xFF4A90E2),
+                            Color(0xFF8E44AD),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text("$done of $total tasks completed"),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteGoal() async {
+    final user = FirebaseAuth.instance.currentUser!;
+    final goalRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('goals')
+        .doc(widget.goalId);
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Delete Goal?"),
+        content: const Text(
+            "This will permanently delete this goal and all its tasks."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              final tasks = await goalRef.collection('tasks').get();
+              for (var doc in tasks.docs) {
+                await doc.reference.delete();
+              }
+
+              await goalRef.delete();
+
+              if (mounted) {
+                Navigator.pop(context);
+                Navigator.pop(context);
+              }
+            },
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _onReorder(
       List<QueryDocumentSnapshot> pending, int oldIndex, int newIndex) async {
     if (newIndex > oldIndex) newIndex--;
@@ -157,9 +288,7 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
     final batch = FirebaseFirestore.instance.batch();
 
     for (int i = 0; i < pending.length; i++) {
-      batch.update(pending[i].reference, {
-        'order': i,
-      });
+      batch.update(pending[i].reference, {'order': i});
     }
 
     await batch.commit();
@@ -193,9 +322,7 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
             Checkbox(
               value: isCompleted,
               onChanged: (value) async {
-                await task.reference.update({
-                  'isCompleted': value ?? false,
-                });
+                await task.reference.update({'isCompleted': value ?? false});
               },
             ),
             Expanded(
@@ -225,7 +352,6 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
     );
   }
 
-  // ADD TASK
   Future<void> _addTask() async {
     final text = _taskController.text.trim();
     if (text.isEmpty) return;
@@ -291,9 +417,8 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await task.reference.update({
-                'title': _taskController.text.trim(),
-              });
+              await task.reference
+                  .update({'title': _taskController.text.trim()});
               if (mounted) Navigator.pop(context);
             },
             child: const Text("Save"),
@@ -315,9 +440,7 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               await task.reference.delete();
               if (mounted) Navigator.pop(context);
