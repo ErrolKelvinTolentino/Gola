@@ -168,6 +168,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
         ..write('|')
         ..write(data['pinned'] == true ? '1' : '0')
         ..write('|')
+        ..write(data['tasksUpdatedAt'] is Timestamp
+            ? (data['tasksUpdatedAt'] as Timestamp).millisecondsSinceEpoch
+            : 0)
+        ..write('|')
         ..write(data['createdAt'] is Timestamp
             ? (data['createdAt'] as Timestamp).millisecondsSinceEpoch
             : 0)
