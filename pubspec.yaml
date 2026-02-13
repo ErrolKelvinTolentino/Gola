@@ -20,6 +20,9 @@ dependencies:
   # API Calls (Gemini)
   http: ^1.2.0
 
+  # Env
+  flutter_dotenv: ^5.1.0
+
   # (Optional but recommended for JSON safety)
   collection: ^1.18.0
 
@@ -33,3 +36,4 @@ flutter:
 
   assets:
     - lib/images/
+    - .env

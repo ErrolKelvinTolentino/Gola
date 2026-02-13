@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GeminiService {
-  // TODO: Replace with your NEW, SECURE API Key
-  static const String apiKey = 'AIzaSyDswsyFeURmFBgHLhkPMQubaEfgND8ZXpE';
+  String get apiKey => dotenv.get('GEMINI_API_KEY', fallback: '');
 
   // The model we are trying to use
   static const String model = 'gemini-2.5-flash';
@@ -18,6 +18,9 @@ class GeminiService {
   Future<void> printAvailableModels() async {
     print("\n--- DIAGNOSTIC: CHECKING AVAILABLE MODELS ---");
     try {
+      if (apiKey.isEmpty) {
+        throw Exception('Missing GEMINI_API_KEY in .env');
+      }
       final response = await http.get(
         Uri.parse('$baseUrl/models?key=$apiKey'),
       );
@@ -53,7 +56,7 @@ class GeminiService {
 
     final prompt = '''
 Break this goal into up to 10 short, clear, actionable tasks. Tasks must be a one time task only.
-Each task must be something that can be checked off in a todo list.
+Each task must be something that can be checked off in a todo list. Generate them in a logical order. 
 
 Return ONLY a valid JSON array of strings. Do NOT use Markdown code blocks.
 
@@ -62,6 +65,9 @@ Description: "${description ?? ''}"
 ''';
 
     try {
+      if (apiKey.isEmpty) {
+        throw Exception('Missing GEMINI_API_KEY in .env');
+      }
       final response = await http.post(
         Uri.parse('$endpoint?key=$apiKey'),
         headers: {'Content-Type': 'application/json'},
