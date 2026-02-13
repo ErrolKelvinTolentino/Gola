@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "138970153234",
+    "project_id": "gola-25a36",
+    "storage_bucket": "gola-25a36.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:138970153234:android:b5427a228bc8bfb0c0f3cb",
+        "android_client_info": {
+          "package_name": "com.example.gola_goal_guidance_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1021SXRavRD_6NDKZK0UiiiEYMNRKpAk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
