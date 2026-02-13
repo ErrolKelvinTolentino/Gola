@@ -47,12 +47,16 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white))
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
             : const Icon(Icons.auto_awesome),
         label: Text(_isLoading ? "Generating..." : "AI Plan"),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: tasksRef.snapshots(),
+        // ✅ FIXED ORDERING HERE
+        stream: tasksRef.orderBy('createdAt', descending: false).snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -61,25 +65,28 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
           final docs = snapshot.data!.docs;
 
           final active =
-              docs.where((d) => (d['isCompleted'] ?? false) == false);
+              docs.where((d) => (d['isCompleted'] ?? false) == false).toList();
+
           final completed =
-              docs.where((d) => (d['isCompleted'] ?? false) == true);
+              docs.where((d) => (d['isCompleted'] ?? false) == true).toList();
 
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
               if (active.isNotEmpty) ...[
-                const Text("Active",
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text(
+                  "Active",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 10),
                 ...active.map((task) => _taskTile(task, false)),
                 const SizedBox(height: 30),
               ],
               if (completed.isNotEmpty) ...[
-                const Text("Completed",
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text(
+                  "Completed",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 10),
                 ...completed.map((task) => _taskTile(task, true)),
               ],
@@ -96,13 +103,17 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
     return Card(
       elevation: 4,
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: ListTile(
         leading: Checkbox(
           value: isCompleted,
           activeColor: const Color(0xFF6C63FF),
           onChanged: (value) async {
-            await task.reference.update({'isCompleted': value});
+            await task.reference.update({
+              'isCompleted': value,
+            });
           },
         ),
         title: Text(
@@ -126,10 +137,13 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
         title: const Text("Delete Task?"),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel")),
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
             onPressed: () async {
               await task.reference.delete();
               if (mounted) Navigator.pop(context);
@@ -145,6 +159,7 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
     setState(() => _isLoading = true);
 
     final user = FirebaseAuth.instance.currentUser!;
+
     final tasksRef = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -152,19 +167,29 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
         .doc(widget.goalId)
         .collection('tasks');
 
-    final tasks = await GeminiService().generateTasks(goalTitle: widget.title);
+    try {
+      final tasks =
+          await GeminiService().generateTasks(goalTitle: widget.title);
 
-    final batch = FirebaseFirestore.instance.batch();
+      final batch = FirebaseFirestore.instance.batch();
 
-    for (final t in tasks) {
-      batch.set(tasksRef.doc(), {
-        'title': t,
-        'isCompleted': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      for (final t in tasks) {
+        batch.set(tasksRef.doc(), {
+          'title': t,
+          'isCompleted': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error generating tasks: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-
-    await batch.commit();
 
     if (mounted) setState(() => _isLoading = false);
   }

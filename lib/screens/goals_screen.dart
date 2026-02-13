@@ -286,8 +286,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
                       style: TextStyle(color: Colors.grey, fontSize: 13),
                     ),
                     const SizedBox(height: 24),
-
-                    // TITLE
                     const Text("Goal Title",
                         style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
@@ -295,9 +293,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                       controller: titleController,
                       decoration: InputDecoration(
                         hintText: "e.g. Launch my portfolio website",
-                        hintStyle: TextStyle(
-                          color: Colors.grey.shade400,
-                        ),
+                        hintStyle: TextStyle(color: Colors.grey.shade400),
                         filled: true,
                         fillColor: Colors.grey.shade100,
                         border: OutlineInputBorder(
@@ -306,33 +302,23 @@ class _GoalsScreenState extends State<GoalsScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 18),
-
-                    // DESCRIPTION
                     const Text("Description (Optional)",
                         style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
-
                     Text(
                       "Describe your goal for better and more specific task generation.",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                      ),
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.grey.shade500),
                     ),
-
                     const SizedBox(height: 8),
-
                     TextField(
                       controller: descriptionController,
                       maxLines: 4,
                       decoration: InputDecoration(
                         hintText:
                             "Include deadlines, constraints, or specific outcomes...",
-                        hintStyle: TextStyle(
-                          color: Colors.grey.shade400,
-                        ),
+                        hintStyle: TextStyle(color: Colors.grey.shade400),
                         filled: true,
                         fillColor: Colors.grey.shade100,
                         border: OutlineInputBorder(
@@ -341,9 +327,24 @@ class _GoalsScreenState extends State<GoalsScreen> {
                         ),
                       ),
                     ),
-
+                    if (isLoading) ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: const [
+                          SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            "Generating AI tasks...",
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 26),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -355,23 +356,27 @@ class _GoalsScreenState extends State<GoalsScreen> {
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF6C63FF),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 26, vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
                           ),
                           onPressed: isLoading
                               ? null
                               : () async {
                                   final title = titleController.text.trim();
+                                  final description =
+                                      descriptionController.text.trim();
 
                                   if (title.isEmpty) return;
 
                                   setDialogState(() => isLoading = true);
 
                                   try {
-                                    // 1️⃣ Create Goal
+                                    // 🔥 Generate AI FIRST
+                                    final tasks =
+                                        await GeminiService().generateTasks(
+                                      goalTitle: title,
+                                      description: description,
+                                    );
+
+                                    // 🔥 Create Goal AFTER tasks ready
                                     final goalDoc = await FirebaseFirestore
                                         .instance
                                         .collection('users')
@@ -379,40 +384,28 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                         .collection('goals')
                                         .add({
                                       'title': title,
-                                      'description':
-                                          descriptionController.text.trim(),
+                                      'description': description,
                                       'createdAt': FieldValue.serverTimestamp(),
                                     });
 
-                                    // 2️⃣ Generate AI Tasks
-                                    final tasks =
-                                        await GeminiService().generateTasks(
-                                      goalTitle: title,
-                                      description:
-                                          descriptionController.text.trim(),
-                                    );
-
-                                    // 3️⃣ Batch Insert Tasks
                                     final batch =
                                         FirebaseFirestore.instance.batch();
 
                                     for (final task in tasks) {
-                                      final taskRef =
-                                          goalDoc.collection('tasks').doc();
-
-                                      batch.set(taskRef, {
-                                        'title': task,
-                                        'isCompleted': false,
-                                        'createdAt':
-                                            FieldValue.serverTimestamp(),
-                                      });
+                                      batch.set(
+                                        goalDoc.collection('tasks').doc(),
+                                        {
+                                          'title': task,
+                                          'isCompleted': false,
+                                          'createdAt':
+                                              FieldValue.serverTimestamp(),
+                                        },
+                                      );
                                     }
 
                                     await batch.commit();
 
-                                    if (mounted) {
-                                      Navigator.pop(context);
-                                    }
+                                    if (mounted) Navigator.pop(context);
                                   } catch (e) {
                                     setDialogState(() => isLoading = false);
 
