@@ -20,7 +20,6 @@ class GoalTaskScreen extends StatefulWidget {
 
 class _GoalTaskScreenState extends State<GoalTaskScreen> {
   final TextEditingController _taskController = TextEditingController();
-  bool? _wasComplete;
 
   @override
   Widget build(BuildContext context) {
@@ -133,9 +132,6 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
                 final total = docs.length;
                 final done = completed.length;
                 final progress = total == 0 ? 0.0 : done / total;
-                final isComplete = total > 0 && done == total;
-
-                _maybeShowCelebration(isComplete, total, theme);
 
                 return ListView(
                   padding: const EdgeInsets.all(20),
@@ -282,105 +278,6 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
     );
   }
 
-  void _maybeShowCelebration(bool isComplete, int total, ThemeData theme) {
-    if (_wasComplete == null) {
-      _wasComplete = isComplete;
-      return;
-    }
-
-    final shouldCelebrate = !_wasComplete! && isComplete;
-    _wasComplete = isComplete;
-
-    if (!shouldCelebrate || !mounted) return;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        barrierDismissible: true,
-        builder: (_) => Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Container(
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                colors: [
-                  theme.colorScheme.primary.withOpacity(0.95),
-                  theme.colorScheme.secondary.withOpacity(0.95),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 24,
-                  color: Colors.black.withOpacity(0.2),
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  height: 72,
-                  width: 72,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.emoji_events_rounded,
-                    color: Colors.white,
-                    size: 40,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Goal completed!',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'You finished $total tasks. Take a moment to celebrate.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Nice!',
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    });
-  }
-
   Future<void> _confirmDeleteGoal() async {
     final user = FirebaseAuth.instance.currentUser!;
     final goalRef = FirebaseFirestore.instance
@@ -483,16 +380,45 @@ class _GoalTaskScreenState extends State<GoalTaskScreen> {
             ),
           ],
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: () => _showEditDialog(task),
+        trailing: PopupMenuButton<String>(
+          icon: Icon(
+            Icons.more_vert,
+            color: theme.colorScheme.onSurface,
+          ),
+          color: theme.colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          onSelected: (value) {
+            if (value == 'edit') {
+              _showEditDialog(task);
+            } else if (value == 'delete') {
+              _confirmDelete(task);
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit, size: 18),
+                  SizedBox(width: 8),
+                  Text('Edit'),
+                ],
+              ),
             ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () => _confirmDelete(task),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete, size: 18, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text(
+                    'Delete',
+                    style: TextStyle(color: Color.fromARGB(255, 199, 190, 189)),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

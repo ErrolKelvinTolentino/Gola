@@ -157,11 +157,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
     }
   }
 
-  void _invalidateGoalsCache() {
-    _goalsSignature = '';
-    _goalsFuture = null;
-  }
-
   String _goalsSignatureFor(List<QueryDocumentSnapshot> goals) {
     final buffer = StringBuffer();
     for (final goal in goals) {
@@ -415,7 +410,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
               // 🔥 FORCE REBUILD WHEN RETURNING
               if (mounted) {
-                _invalidateGoalsCache();
                 setState(() {});
               }
             },
@@ -531,267 +525,299 @@ class _GoalsScreenState extends State<GoalsScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             final theme = Theme.of(context);
+
             return Dialog(
               backgroundColor: theme.colorScheme.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(28),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "✨ Create a New Goal",
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "Break your ambition into actionable steps.",
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.textTheme.bodySmall?.color
-                                ?.withOpacity(0.7) ??
-                            Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      "Goal Title",
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: titleController,
-                      style: TextStyle(color: theme.colorScheme.onSurface),
-                      decoration: InputDecoration(
-                        hintText: "e.g. Launch my portfolio website",
-                        hintStyle: TextStyle(
-                          color: theme.textTheme.bodySmall?.color
-                                  ?.withOpacity(0.6) ??
-                              Colors.grey,
-                        ),
-                        filled: true,
-                        fillColor:
-                            theme.colorScheme.surfaceVariant.withOpacity(0.9),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color:
-                                theme.colorScheme.onSurface.withOpacity(0.18),
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.85,
+                ),
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(28),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "✨ Create a New Goal",
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color:
-                                theme.colorScheme.onSurface.withOpacity(0.12),
+                        const SizedBox(height: 6),
+                        Text(
+                          "Break your ambition into actionable steps.",
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.textTheme.bodySmall?.color
+                                    ?.withOpacity(0.7) ??
+                                Colors.grey,
                           ),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color: theme.colorScheme.primary.withOpacity(0.4),
+                        const SizedBox(height: 24),
+
+                        // TITLE
+                        Text(
+                          "Goal Title",
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      "Description (Optional)",
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: descriptionController,
-                      maxLines: 4,
-                      style: TextStyle(color: theme.colorScheme.onSurface),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor:
-                            theme.colorScheme.surfaceVariant.withOpacity(0.9),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color:
-                                theme.colorScheme.onSurface.withOpacity(0.18),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color:
-                                theme.colorScheme.onSurface.withOpacity(0.12),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color: theme.colorScheme.primary.withOpacity(0.4),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color:
-                            theme.colorScheme.surfaceVariant.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: theme.colorScheme.onSurface.withOpacity(0.08),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Generate tasks with AI',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.w600,
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: titleController,
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(
+                            hintText: "e.g. Launch my portfolio website",
+                            filled: true,
+                            fillColor: theme.colorScheme.surfaceVariant
+                                .withOpacity(0.9),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.08),
+                                width: 1,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.08),
+                                width: 1,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color:
+                                    theme.colorScheme.primary.withOpacity(0.4),
+                                width: 1.5,
                               ),
                             ),
                           ),
-                          Switch(
-                            value: useAiTasks,
-                            onChanged: isLoading
-                                ? null
-                                : (value) {
-                                    setDialogState(() {
-                                      useAiTasks = value;
-                                    });
-                                  },
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isLoading) ...[
-                      const SizedBox(height: 16),
-                      Row(
-                        children: const [
-                          SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          SizedBox(width: 10),
-                          Text(
-                            "Generating AI tasks...",
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 26),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        TextButton(
-                          onPressed:
-                              isLoading ? null : () => Navigator.pop(context),
-                          child: const Text("Cancel"),
                         ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF6C63FF),
+
+                        const SizedBox(height: 18),
+
+                        // DESCRIPTION
+                        Text(
+                          "Description (Optional)",
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
                           ),
-                          onPressed: isLoading
-                              ? null
-                              : () async {
-                                  final title = titleController.text.trim();
-                                  final description =
-                                      descriptionController.text.trim();
+                        ),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: descriptionController,
+                          maxLines: 4,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: theme.colorScheme.surfaceVariant
+                                .withOpacity(0.9),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.08),
+                                width: 1,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.08),
+                                width: 1,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color:
+                                    theme.colorScheme.primary.withOpacity(0.4),
+                                width: 1.5,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                          ),
+                        ),
 
-                                  if (title.isEmpty) return;
+                        const SizedBox(height: 14),
 
-                                  setDialogState(() => isLoading = true);
+                        // AI SWITCH
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceVariant
+                                .withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Generate tasks with AI',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Switch(
+                                value: useAiTasks,
+                                onChanged: isLoading
+                                    ? null
+                                    : (value) {
+                                        setDialogState(() {
+                                          useAiTasks = value;
+                                        });
+                                      },
+                              ),
+                            ],
+                          ),
+                        ),
 
-                                  try {
-                                    final goalCollection = FirebaseFirestore
-                                        .instance
-                                        .collection('users')
-                                        .doc(user!.uid)
-                                        .collection('goals');
+                        if (isLoading) ...[
+                          const SizedBox(height: 16),
+                          Row(
+                            children: const [
+                              SizedBox(
+                                height: 16,
+                                width: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 10),
+                              Text(
+                                "Generating AI tasks...",
+                                style:
+                                    TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ],
 
-                                    final tasks = useAiTasks
-                                        ? await GeminiService().generateTasks(
-                                            goalTitle: title,
-                                            description: description,
-                                          )
-                                        : <String>[];
+                        const SizedBox(height: 26),
 
-                                    final goalDoc = goalCollection.doc();
-                                    final batch =
-                                        FirebaseFirestore.instance.batch();
+                        // BUTTONS
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TextButton(
+                              onPressed: isLoading
+                                  ? null
+                                  : () => Navigator.pop(context),
+                              child: const Text("Cancel"),
+                            ),
+                            ElevatedButton(
+                              onPressed: isLoading
+                                  ? null
+                                  : () async {
+                                      final title = titleController.text.trim();
+                                      final description =
+                                          descriptionController.text.trim();
 
-                                    batch.set(goalDoc, {
-                                      'title': title,
-                                      'description': description,
-                                      'createdAt': FieldValue.serverTimestamp(),
-                                      'pinned': false,
-                                    });
+                                      if (title.isEmpty) return;
 
-                                    if (useAiTasks) {
-                                      for (int i = 0; i < tasks.length; i++) {
-                                        final task = tasks[i];
-                                        batch.set(
-                                          goalDoc.collection('tasks').doc(),
-                                          {
-                                            'title': task,
-                                            'isCompleted': false,
-                                            'createdAt':
-                                                FieldValue.serverTimestamp(),
-                                            'order': i,
-                                          },
+                                      setDialogState(() => isLoading = true);
+
+                                      try {
+                                        final goalCollection = FirebaseFirestore
+                                            .instance
+                                            .collection('users')
+                                            .doc(user!.uid)
+                                            .collection('goals');
+
+                                        final tasks = useAiTasks
+                                            ? await GeminiService()
+                                                .generateTasks(
+                                                goalTitle: title,
+                                                description: description,
+                                              )
+                                            : <String>[];
+
+                                        final goalDoc = goalCollection.doc();
+                                        final batch =
+                                            FirebaseFirestore.instance.batch();
+
+                                        batch.set(goalDoc, {
+                                          'title': title,
+                                          'description': description,
+                                          'createdAt':
+                                              FieldValue.serverTimestamp(),
+                                          'pinned': false,
+                                        });
+
+                                        if (useAiTasks) {
+                                          for (int i = 0;
+                                              i < tasks.length;
+                                              i++) {
+                                            batch.set(
+                                              goalDoc.collection('tasks').doc(),
+                                              {
+                                                'title': tasks[i],
+                                                'isCompleted': false,
+                                                'createdAt': FieldValue
+                                                    .serverTimestamp(),
+                                                'order': i,
+                                              },
+                                            );
+                                          }
+                                        }
+
+                                        await batch.commit();
+
+                                        if (mounted) {
+                                          Navigator.pop(context);
+                                        }
+                                      } catch (e) {
+                                        setDialogState(() => isLoading = false);
+
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text("Error: $e"),
+                                            backgroundColor: Colors.red,
+                                          ),
                                         );
                                       }
-                                    }
-
-                                    await batch.commit();
-
-                                    if (mounted) Navigator.pop(context);
-                                  } catch (e) {
-                                    setDialogState(() => isLoading = false);
-
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text("Error: $e"),
-                                        backgroundColor: Colors.red,
+                                    },
+                              child: isLoading
+                                  ? const SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
                                       ),
-                                    );
-                                  }
-                                },
-                          child: isLoading
-                              ? const SizedBox(
-                                  height: 18,
-                                  width: 18,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  "Create Goal",
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
+                                    )
+                                  : const Text(
+                                      "Create Goal",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             );
